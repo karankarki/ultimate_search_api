@@ -13,8 +13,16 @@ const getPaginatedItems = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 40));
+    const paginationType = req.query.type || 'offset'; // 'offset' or 'cursor'
+    const cursor = req.query.cursor || null;
 
-    const result = await itemModel.getPaginatedItems(req.user.userId, page, limit);
+    let result;
+    if (paginationType === 'cursor') {
+      result = await itemModel.getPaginatedItemsCursor(req.user.userId, cursor ? parseInt(cursor, 10) : null, limit);
+    } else {
+      result = await itemModel.getPaginatedItemsOffset(req.user.userId, page, limit);
+    }
+
     return res.json(result);
   } catch (error) {
     next(error);
@@ -30,8 +38,16 @@ const searchItems = async (req, res, next) => {
 
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 40));
+    const paginationType = req.query.type || 'offset'; // 'offset' or 'cursor'
+    const cursor = req.query.cursor || null;
 
-    const result = await itemModel.searchItems(req.user.userId, q.trim(), page, limit);
+    let result;
+    if (paginationType === 'cursor') {
+      result = await itemModel.searchItemsCursor(req.user.userId, q.trim(), cursor ? parseInt(cursor, 10) : null, limit);
+    } else {
+      result = await itemModel.searchItemsOffset(req.user.userId, q.trim(), page, limit);
+    }
+
     return res.json(result);
   } catch (error) {
     next(error);

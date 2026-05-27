@@ -4,9 +4,17 @@ import { useNavigate } from 'react-router-dom';
 function Items() {
   const [items, setItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [paginationType, setPaginationType] = useState('offset'); // 'offset' or 'cursor'
+  
+  // Offset pagination state
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [pages, setPages] = useState(0);
+  
+  // Cursor pagination state
+  const [cursors, setCursors] = useState([]); // Stack of cursors for back navigation
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  
+  // Common state
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [userEmail] = useState(localStorage.getItem('userEmail') || '');
@@ -24,9 +32,20 @@ function Items() {
       setLoading(true);
       setMessage('');
       try {
-        const url = searchQuery.trim()
-          ? `/api/items/search?q=${encodeURIComponent(searchQuery)}&page=${page}&limit=${limit}`
-          : `/api/items?page=${page}&limit=${limit}`;
+        let url;
+        
+        if (paginationType === 'cursor') {
+          // Cursor-based pagination
+          const currentCursor = cursors.length > 0 ? cursors[cursors.length - 1] : null;
+          url = searchQuery.trim()
+            ? `/api/items/search?q=${encodeURIComponent(searchQuery)}&type=cursor&cursor=${currentCursor || ''}&limit=${limit}`
+            : `/api/items?type=cursor&cursor=${currentCursor || ''}&limit=${limit}`;
+        } else {
+          // Offset-based pagination
+          url = searchQuery.trim()
+            ? `/api/items/search?q=${encodeURIComponent(searchQuery)}&type=offset&page=${page}&limit=${limit}`
+            : `/api/items?type=offset&page=${page}&limit=${limit}`;
+        }
 
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` },
@@ -46,8 +65,14 @@ function Items() {
         }
 
         setItems(data.items);
-        setTotal(data.total);
-        setPages(data.pages);
+        
+        if (paginationType === 'cursor') {
+          setNextCursor(data.nextCursor);
+          setHasMore(data.hasMore);
+        } else {
+          // For offset pagination, use hasMore to determine if there's a next page
+          setHasMore(data.hasMore);
+        }
       } catch (err) {
         setMessage('Unable to connect to server');
       } finally {
@@ -56,11 +81,20 @@ function Items() {
     };
 
     loadItems();
-  }, [token, navigate, page, searchQuery]);
+  }, [token, navigate, page, paginationType, searchQuery, cursors]);
 
   const handleSearch = (query) => {
     setSearchQuery(query);
     setPage(1);
+    setCursors([]);
+    setNextCursor(null);
+  };
+
+  const handlePaginationTypeChange = (type) => {
+    setPaginationType(type);
+    setPage(1);
+    setCursors([]);
+    setNextCursor(null);
   };
 
   const logout = async () => {
@@ -78,9 +112,26 @@ function Items() {
     }
   };
 
+  // Offset pagination handlers
   const goToPage = (newPage) => {
-    if (newPage >= 1 && newPage <= pages) {
+    if (newPage >= 1) {
       setPage(newPage);
+      window.scrollTo(0, 0);
+    }
+  };
+
+  // Cursor pagination handlers
+  const goToNextPage = () => {
+    if (hasMore && nextCursor) {
+      setCursors([...cursors, nextCursor]);
+      window.scrollTo(0, 0);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (cursors.length > 0) {
+      const newCursors = cursors.slice(0, -1);
+      setCursors(newCursors);
       window.scrollTo(0, 0);
     }
   };
@@ -107,9 +158,18 @@ function Items() {
             onChange={(e) => handleSearch(e.target.value)}
             className="search-input"
           />
-          <span className="search-result-count">
-            {searchQuery && !loading ? `${total} result${total !== 1 ? 's' : ''}` : total > 0 ? `${total.toLocaleString()} items` : ''}
-          </span>
+        </div>
+
+        <div className="pagination-type-selector">
+          <label>Pagination Type:</label>
+          <select 
+            value={paginationType} 
+            onChange={(e) => handlePaginationTypeChange(e.target.value)}
+            className="pagination-select"
+          >
+            <option value="offset">📄 Offset (Page Numbers)</option>
+            <option value="cursor">🔗 Cursor (Infinite Scroll)</option>
+          </select>
         </div>
 
         {message && <p className="message error">{message}</p>}
@@ -144,26 +204,52 @@ function Items() {
                 ))}
               </div>
 
-              {pages > 1 && (
-                <div className="pagination">
-                  <button 
-                    disabled={page === 1} 
-                    onClick={() => goToPage(page - 1)}
-                    className="pagination-btn"
-                  >
-                    ← Previous
-                  </button>
-                  <div className="pagination-info">
-                    Page <strong>{page}</strong> of <strong>{pages}</strong>
+              {paginationType === 'offset' ? (
+                // Offset Pagination UI
+                (page > 1 || hasMore) && (
+                  <div className="pagination">
+                    <button 
+                      disabled={page === 1} 
+                      onClick={() => goToPage(page - 1)}
+                      className="pagination-btn"
+                    >
+                      ← Previous
+                    </button>
+                    <div className="pagination-info">
+                      Page <strong>{page}</strong>
+                    </div>
+                    <button 
+                      disabled={!hasMore} 
+                      onClick={() => goToPage(page + 1)}
+                      className="pagination-btn"
+                    >
+                      Next →
+                    </button>
                   </div>
-                  <button 
-                    disabled={page === pages} 
-                    onClick={() => goToPage(page + 1)}
-                    className="pagination-btn"
-                  >
-                    Next →
-                  </button>
-                </div>
+                )
+              ) : (
+                // Cursor Pagination UI
+                (hasMore || cursors.length > 0) && (
+                  <div className="pagination">
+                    <button 
+                      disabled={cursors.length === 0} 
+                      onClick={goToPreviousPage}
+                      className="pagination-btn"
+                    >
+                      ← Previous
+                    </button>
+                    <div className="pagination-info">
+                      {cursors.length > 0 ? `Page ${cursors.length + 1}` : 'Page 1'}
+                    </div>
+                    <button 
+                      disabled={!hasMore} 
+                      onClick={goToNextPage}
+                      className="pagination-btn"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )
               )}
             </>
           )}

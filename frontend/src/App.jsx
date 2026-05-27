@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import About from './pages/About';
 import Items from './pages/Items';
 import AddItem from './pages/AddItem';
+import NotFound from './pages/NotFound';
 import './App.css';
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
           <Route path="/auth" element={<Auth />} />
           <Route path="/items" element={<Items />} />
           <Route path="/add-item" element={<AddItem />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
       <footer className="app-footer">

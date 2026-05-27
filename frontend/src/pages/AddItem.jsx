@@ -47,7 +47,7 @@ function AddItem() {
         navigate('/items');
       }, 800);
     } catch (err) {
-      setMessage('Unable to connect to server');
+      setMessage('Server is Down. Please try again later.');
       setLoading(false);
     }
   };
