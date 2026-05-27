@@ -21,54 +21,88 @@ describe('Item Controller', () => {
   });
 
   describe('getPaginatedItems', () => {
-    it('should return paginated items', async () => {
-      req.query = { page: '1', limit: '40' };
+    it('should return paginated items with offset type', async () => {
+      req.query = { page: '1', limit: '40', type: 'offset' };
       const mockResult = {
         items: [{ id: 1, title: 'Item 1' }],
-        total: 100,
         page: 1,
-        pages: 3,
+        limit: 40,
+        hasMore: true,
       };
 
-      itemModel.getPaginatedItems.mockResolvedValueOnce(mockResult);
+      itemModel.getPaginatedItemsOffset.mockResolvedValueOnce(mockResult);
 
       await itemController.getPaginatedItems(req, res, next);
 
-      expect(itemModel.getPaginatedItems).toHaveBeenCalledWith(1, 1, 40);
+      expect(itemModel.getPaginatedItemsOffset).toHaveBeenCalledWith(1, 1, 40);
       expect(res.json).toHaveBeenCalledWith(mockResult);
     });
 
-    it('should default to page 1 and limit 40', async () => {
+    it('should return paginated items with cursor type', async () => {
+      req.query = { cursor: '5', limit: '40', type: 'cursor' };
       const mockResult = {
-        items: [],
-        total: 0,
-        page: 1,
-        pages: 0,
+        items: [{ id: 4, title: 'Item 4' }],
+        nextCursor: 3,
+        hasMore: true,
+        limit: 40,
       };
 
-      itemModel.getPaginatedItems.mockResolvedValueOnce(mockResult);
+      itemModel.getPaginatedItemsCursor.mockResolvedValueOnce(mockResult);
 
       await itemController.getPaginatedItems(req, res, next);
 
-      expect(itemModel.getPaginatedItems).toHaveBeenCalledWith(1, 1, 40);
+      expect(itemModel.getPaginatedItemsCursor).toHaveBeenCalledWith(1, 5, 40);
+      expect(res.json).toHaveBeenCalledWith(mockResult);
+    });
+
+    it('should default to offset type with page 1 and limit 40', async () => {
+      const mockResult = {
+        items: [],
+        page: 1,
+        limit: 40,
+        hasMore: false,
+      };
+
+      itemModel.getPaginatedItemsOffset.mockResolvedValueOnce(mockResult);
+
+      await itemController.getPaginatedItems(req, res, next);
+
+      expect(itemModel.getPaginatedItemsOffset).toHaveBeenCalledWith(1, 1, 40);
     });
   });
 
   describe('searchItems', () => {
-    it('should search items by query', async () => {
-      req.query = { q: 'react', page: '1', limit: '40' };
+    it('should search items by query with offset type', async () => {
+      req.query = { q: 'react', page: '1', limit: '40', type: 'offset' };
       const mockResult = {
         items: [{ id: 1, title: 'Learn React' }],
-        total: 1,
         page: 1,
-        pages: 1,
+        limit: 40,
+        hasMore: false,
       };
 
-      itemModel.searchItems.mockResolvedValueOnce(mockResult);
+      itemModel.searchItemsOffset.mockResolvedValueOnce(mockResult);
 
       await itemController.searchItems(req, res, next);
 
-      expect(itemModel.searchItems).toHaveBeenCalledWith(1, 'react', 1, 40);
+      expect(itemModel.searchItemsOffset).toHaveBeenCalledWith(1, 'react', 1, 40);
+      expect(res.json).toHaveBeenCalledWith(mockResult);
+    });
+
+    it('should search items by query with cursor type', async () => {
+      req.query = { q: 'react', cursor: '10', limit: '40', type: 'cursor' };
+      const mockResult = {
+        items: [{ id: 9, title: 'React Hooks' }],
+        nextCursor: 8,
+        hasMore: true,
+        limit: 40,
+      };
+
+      itemModel.searchItemsCursor.mockResolvedValueOnce(mockResult);
+
+      await itemController.searchItems(req, res, next);
+
+      expect(itemModel.searchItemsCursor).toHaveBeenCalledWith(1, 'react', 10, 40);
       expect(res.json).toHaveBeenCalledWith(mockResult);
     });
 
